@@ -1,0 +1,4 @@
+# Ignore downloaded data files by default; remove ignores if you intend to commit data.
+*.csv
+!spy_1min.csv
+!spy_daily.csv

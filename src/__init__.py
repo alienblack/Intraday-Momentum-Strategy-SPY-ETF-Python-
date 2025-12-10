@@ -1,0 +1,1 @@
+"""Intraday momentum strategy components."""

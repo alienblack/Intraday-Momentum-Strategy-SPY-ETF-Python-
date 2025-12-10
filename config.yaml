@@ -1,0 +1,21 @@
+# Configuration for intraday SPY momentum backtest
+
+data:
+  intraday_path: data/spy_1min.csv
+  daily_path: data/spy_daily.csv
+  timezone: America/New_York
+
+strategy:
+  lookback: 20
+  volatility_multiple: 1.0
+  max_position: 1.0
+  transaction_cost_bps: 0.5
+  hold_bars: 30
+
+portfolio:
+  initial_capital: 100000
+  transaction_cost_bps: 0.5
+
+backtest:
+  resample_minutes: 1
+  periods_per_year: 98280  # 252 trading days * 390 minutes
