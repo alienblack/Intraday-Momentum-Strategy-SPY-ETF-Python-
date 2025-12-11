@@ -1,32 +1,30 @@
 # Intraday Momentum Strategy (SPY)
 
-Quick-start scaffolding for experimenting with an intraday momentum strategy on SPY using 1-minute OHLCV data.
+Event-driven intraday momentum backtester on 1-minute SPY OHLCV with dynamic “noise bands”, VWAP trailing stops, and volatility-targeted sizing. Includes trade logs, equity output, and basic analytics (Sharpe, max drawdown, alpha/beta vs SPY, monthly returns).
 
 ## Project layout
 
 ```
 intraday-momentum-spy/
 ├─ data/
-│  ├─ spy_1min.csv      # raw intraday OHLCV
-│  └─ spy_daily.csv     # daily OHLCV for volatility calc
+│  ├─ spy_1min.csv      # intraday OHLCV (not tracked)
+│  └─ spy_daily.csv     # daily OHLCV (not tracked)
 ├─ src/
-│  ├─ __init__.py
-│  ├─ analytics.py
-│  ├─ backtester.py
-│  ├─ data_loader.py
-│  ├─ noise_area.py
-│  ├─ portfolio.py
-│  ├─ strategy.py
-│  └─ vwap.py
-├─ notebooks/
-│  └─ 01_eda.ipynb      # optional EDA and plotting
-├─ config.yaml          # parameters
+│  ├─ analytics.py      # Sharpe, max DD, alpha/beta, monthly returns
+│  ├─ backtester.py     # event-driven engine (bands, VWAP stop, sizing)
+│  ├─ data_loader.py    # CSV loaders
+│  ├─ noise_area.py     # time-of-day sigma, gap-adjusted bands
+│  ├─ vwap.py           # session VWAP
+│  └─ ...
+├─ scripts/
+│  ├─ download_data.py  # fetch intraday/daily CSVs (Polygon/Massive)
+│  ├─ run_backtest.py   # run strategy and write trades/equity
+│  └─ param_sweep.py    # optional parameter sweep (VM, sizing, entry rules)
+├─ tests/               # minimal unit tests for bands and VWAP
 └─ README.md
 ```
 
 ## Setup
-
-Install Python dependencies (example):
 
 ```bash
 python -m venv .venv
@@ -34,38 +32,49 @@ source .venv/bin/activate
 pip install pandas numpy
 ```
 
-## Data acquisition
+## Data
 
-Intraday and daily SPY data are not bundled. Fetch fresh data (e.g., from Polygon) with the helper script:
-
+Data is not bundled. Fetch from Polygon/Massive (adjust dates):
 ```bash
 pip install requests
 export POLYGON_API_KEY=your_key
-python scripts/download_data.py --start-date 2019-01-01 --end-date 2024-01-31 \
+python scripts/download_data.py --base-url https://api.massive.com \
+  --start-date 2024-01-01 --end-date 2024-12-31 \
   --intraday-path data/spy_1min.csv --daily-path data/spy_daily.csv
 ```
+Files should have headers:
+- `data/spy_1min.csv`: timestamp,open,high,low,close,volume
+- `data/spy_daily.csv`: date,open,high,low,close,volume
 
-Adjust date ranges as needed. The script writes `timestamp,open,high,low,close,volume` for intraday and `date,open,high,low,close,volume` for daily bars.
+## Run backtest
 
-## Usage
-
-1. Drop raw data into `data/spy_1min.csv` and `data/spy_daily.csv` using the headers already provided.
-2. Adjust parameters in `config.yaml` (lookback, volatility multiplier, transaction costs, etc.).
-3. Run a quick backtest in Python:
-
-```python
-import pandas as pd
-from src.data_loader import load_intraday
-from src.backtester import Backtester
-
-intraday = load_intraday("data/spy_1min.csv")
-bt = Backtester()
-result = bt.run(intraday)
-print(result.performance.tail())
+```bash
+python scripts/run_backtest.py \
+  --start 2024-01-01 --end 2024-12-31 \
+  --intraday data/spy_1min.csv --daily data/spy_daily.csv \
+  --output-dir outputs \
+  --earliest-entry 10:00 \
+  --entry-buffer-pct 0.001   # 0.1% band buffer
 ```
 
-## Notes
+Outputs:
+- `outputs/trades.csv`: entry/exit, side, price, size, PnL, exit reason.
+- `outputs/equity.csv`: daily equity_start/end, PnL, vol estimate, shares.
 
-- Strategy is momentum-based with volatility-scaled thresholds and a noise band derived from ATR.
-- Portfolio assumes fractional exposure sizing (±1.0 = 100% notional) and simple bps-based trading costs.
-- `notebooks/01_eda.ipynb` is a placeholder for exploratory charts and sanity checks once data is available.
+Console summary: total return, CAGR, Sharpe, max DD, alpha/beta vs SPY, hit ratio, monthly returns.
+
+## Parameter sweep (optional)
+
+Test grids of volatility multiplier (VM), sizing target, entry time, and band buffer:
+```bash
+python scripts/param_sweep.py \
+  --start 2024-01-01 --end 2024-12-31 \
+  --intraday data/spy_1min.csv --daily data/spy_daily.csv
+```
+Adjust the lists in flags if you need a narrower/faster search.
+
+## Notes and limitations
+
+- Strategy matches the paper’s rules: time-of-day noise bands with gap adjustment, semi-hourly decisions, VWAP trailing stop, vol-target sizing (σ_target with 4x cap), costs of $0.0035 commission + $0.001 slippage per share.
+- Recent runs on 2024 data show weak Sharpe; treat results as research, not production-ready alpha.
+- Keep data/ CSVs untracked; use a separate data branch if needed.

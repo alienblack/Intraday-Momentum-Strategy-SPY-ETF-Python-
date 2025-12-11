@@ -24,15 +24,16 @@ from src.data_loader import load_daily, load_intraday  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Parameter sweep for VM and sigma_target.")
+    p = argparse.ArgumentParser(description="Parameter sweep for VM, sigma_target, entry time, and buffer.")
     p.add_argument("--intraday", default="data/spy_1min.csv")
     p.add_argument("--daily", default="data/spy_daily.csv")
     p.add_argument("--start", default=None, help="Start date (YYYY-MM-DD)")
     p.add_argument("--end", default=None, help="End date (YYYY-MM-DD)")
-    p.add_argument("--vm", nargs="+", type=float, default=[0.8, 1.0, 1.2, 1.5], help="Volatility multipliers to test")
-    p.add_argument("--sigma-target", nargs="+", type=float, default=[0.015, 0.02, 0.025], help="Target daily vol levels to test")
-    p.add_argument("--earliest-entry", default="10:00", help="Earliest HH:MM to begin trading (default: 10:00)")
-    p.add_argument("--entry-buffer-pct", type=float, default=0.001, help="Band buffer for entries (default 0.001 = 0.1%)")
+    # Narrow defaults to keep runtime reasonable; adjust as needed.
+    p.add_argument("--vm", nargs="+", type=float, default=[0.8, 1.0, 1.2], help="Volatility multipliers to test")
+    p.add_argument("--sigma-target", nargs="+", type=float, default=[0.015, 0.018, 0.02], help="Target daily vol levels to test")
+    p.add_argument("--earliest-entry", nargs="+", default=["10:00", "10:30"], help="Earliest HH:MM to begin trading")
+    p.add_argument("--entry-buffer-pct", nargs="+", type=float, default=[0.001, 0.002], help="Band buffer pct list (0.001 = 0.1%)")
     return p.parse_args()
 
 
@@ -60,37 +61,41 @@ def run_grid(
     daily: pd.DataFrame,
     vms: Iterable[float],
     sigma_targets: Iterable[float],
-    earliest_entry: str,
-    entry_buffer: float,
+    earliest_entries: Iterable[str],
+    entry_buffers: Iterable[float],
 ) -> pd.DataFrame:
     rows = []
-    hh, mm = map(int, earliest_entry.split(":"))
-    entry_time = pd.Timestamp.today().replace(hour=hh, minute=mm, second=0, microsecond=0).time()
-    for vm in vms:
-        for sig in sigma_targets:
-            cfg = BacktesterConfig(
-                volatility_multiplier=vm,
-                target_daily_vol=sig,
-                earliest_entry_time=entry_time,
-                entry_buffer_pct=entry_buffer,
-            )
-            bt = Backtester(cfg)
-            res = bt.run(intraday, daily)
-            bench = daily["close"].pct_change().dropna()
-            summary = summarize_equity(res.equity, bench)
-            rows.append(
-                {
-                    "vm": vm,
-                    "sigma_target": sig,
-                    "total_return": summary.total_return,
-                    "cagr": summary.cagr,
-                    "sharpe": summary.sharpe,
-                    "max_dd": summary.max_drawdown,
-                    "alpha": summary.alpha,
-                    "beta": summary.beta,
-                    "hit_ratio": summary.hit_ratio,
-                }
-            )
+    for ee in earliest_entries:
+        hh, mm = map(int, ee.split(":"))
+        entry_time = pd.Timestamp.today().replace(hour=hh, minute=mm, second=0, microsecond=0).time()
+        for vm in vms:
+            for sig in sigma_targets:
+                for buf in entry_buffers:
+                    cfg = BacktesterConfig(
+                        volatility_multiplier=vm,
+                        target_daily_vol=sig,
+                        earliest_entry_time=entry_time,
+                        entry_buffer_pct=buf,
+                    )
+                    bt = Backtester(cfg)
+                    res = bt.run(intraday, daily)
+                    bench = daily["close"].pct_change().dropna()
+                    summary = summarize_equity(res.equity, bench)
+                    rows.append(
+                        {
+                            "earliest_entry": ee,
+                            "entry_buffer": buf,
+                            "vm": vm,
+                            "sigma_target": sig,
+                            "total_return": summary.total_return,
+                            "cagr": summary.cagr,
+                            "sharpe": summary.sharpe,
+                            "max_dd": summary.max_drawdown,
+                            "alpha": summary.alpha,
+                            "beta": summary.beta,
+                            "hit_ratio": summary.hit_ratio,
+                        }
+                    )
     return pd.DataFrame(rows)
 
 
@@ -104,7 +109,7 @@ def main() -> int:
         daily = maybe_clip(daily, args.start, args.end)
 
     df = run_grid(intraday, daily, args.vm, args.sigma_target, args.earliest_entry, args.entry_buffer_pct)
-    df = df.sort_values("sharpe", ascending=False)
+    df = df.sort_values(["sharpe", "total_return"], ascending=False)
     print(df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
     best = df.iloc[0]
     print("\nBest by Sharpe:")
