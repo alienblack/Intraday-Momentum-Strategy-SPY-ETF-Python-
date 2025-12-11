@@ -46,6 +46,8 @@ Files should have headers:
 - `data/spy_1min.csv`: timestamp,open,high,low,close,volume
 - `data/spy_daily.csv`: date,open,high,low,close,volume
 
+Keep CSVs untracked (separate data branch recommended).
+
 ## Run backtest
 
 ```bash
@@ -71,10 +73,14 @@ python scripts/param_sweep.py \
   --start 2024-01-01 --end 2024-12-31 \
   --intraday data/spy_1min.csv --daily data/spy_daily.csv
 ```
-Adjust the lists in flags if you need a narrower/faster search.
+Defaults are narrowed for runtime; adjust flags for broader sweeps.
 
 ## Notes and limitations
 
-- Strategy matches the paper’s rules: time-of-day noise bands with gap adjustment, semi-hourly decisions, VWAP trailing stop, vol-target sizing (σ_target with 4x cap), costs of $0.0035 commission + $0.001 slippage per share.
+- Follows the paper’s rules: time-of-day noise bands with gap adjustment, semi-hourly decisions, VWAP trailing stop, vol-target sizing (σ_target with 4x cap), costs of $0.0035 commission + $0.001 slippage per share.
 - Recent runs on 2024 data show weak Sharpe; treat results as research, not production-ready alpha.
-- Keep data/ CSVs untracked; use a separate data branch if needed.
+- Keep data CSVs untracked; use a separate data branch if needed.
+
+## CI
+
+GitHub Actions runs the unit tests (bands and VWAP) on pushes/PRs to `main` and `dev`.

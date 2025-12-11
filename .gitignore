@@ -1,19 +1,10 @@
-outputs/
-
-# ignore outputs and caches
-outputs/
+# Bytecode and caches
 __pycache__/
 *.pyc
 
-# ignore caches/outputs
-__pycache__/
-*.pyc
+# Outputs
 outputs/
 
-__pycache__/
-*.pyc
-outputs/
-
-__pycache__/
-*.pyc
-outputs/
+# Local data (keep untracked)
+data/spy_1min.csv
+data/spy_daily.csv
