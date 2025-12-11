@@ -1,1 +1,6 @@
 outputs/
+
+# ignore outputs and caches
+outputs/
+__pycache__/
+*.pyc
