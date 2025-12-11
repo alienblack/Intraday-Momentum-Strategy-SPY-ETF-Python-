@@ -26,6 +26,8 @@ class BacktesterConfig:
     slippage_per_share: float = 0.001
     initial_capital: float = 100_000.0
     decision_minutes: Sequence[int] = (0, 30)  # HH:00 and HH:30
+    earliest_entry_time: dt.time = dt.time(10, 0)  # skip opening chop by default
+    entry_buffer_pct: float = 0.001  # require price to clear band by 0.1%
 
 
 @dataclass
@@ -128,6 +130,9 @@ class Backtester:
             last_row = session_df.iloc[-1]
 
             for ts, row in session_df.iterrows():
+                if ts.time() < self.config.earliest_entry_time:
+                    continue
+
                 price = row["close"]
                 upper = row["upper"]
                 lower = row["lower"]
@@ -168,9 +173,12 @@ class Backtester:
                 # Entry / flip logic
                 desired_pos = pos
                 exit_reason = None
-                if price > upper:
+                upper_buf = upper * (1 + self.config.entry_buffer_pct)
+                lower_buf = lower * (1 - self.config.entry_buffer_pct)
+
+                if price > upper_buf:
                     desired_pos = 1
-                elif price < lower:
+                elif price < lower_buf:
                     desired_pos = -1
                 else:
                     desired_pos = 0

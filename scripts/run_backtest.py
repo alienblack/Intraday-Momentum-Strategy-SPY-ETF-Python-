@@ -36,6 +36,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end", default=None, help="End date (YYYY-MM-DD, inclusive)")
     parser.add_argument("--output-dir", default="outputs", help="Directory to write trades/equity CSVs")
     parser.add_argument("--base-url", default=None, help="Ignored (kept for CLI compatibility with download script).")
+    parser.add_argument("--earliest-entry", default="10:00", help="Earliest HH:MM to begin trading (default: 10:00)")
+    parser.add_argument("--entry-buffer-pct", type=float, default=0.001, help="Require price to clear band by this pct before entry (default 0.001 = 0.1%)")
     return parser.parse_args()
 
 
@@ -67,7 +69,11 @@ def main() -> int:
         intraday = maybe_clip(intraday, args.start, args.end)
         daily = maybe_clip(daily, args.start, args.end)
 
-    cfg = BacktesterConfig()
+    hh, mm = map(int, args.earliest_entry.split(":"))
+    cfg = BacktesterConfig(
+        earliest_entry_time=dt.time(hh, mm),
+        entry_buffer_pct=args.entry_buffer_pct,
+    )
     bt = Backtester(cfg)
     result = bt.run(intraday, daily)
 

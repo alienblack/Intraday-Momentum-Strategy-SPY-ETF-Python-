@@ -1,0 +1,19 @@
+outputs/
+
+# ignore outputs and caches
+outputs/
+__pycache__/
+*.pyc
+
+# ignore caches/outputs
+__pycache__/
+*.pyc
+outputs/
+
+__pycache__/
+*.pyc
+outputs/
+
+__pycache__/
+*.pyc
+outputs/
